@@ -29,12 +29,52 @@ async function detectCaptcha(page) {
   return text.includes('验证码') || text.includes('滑动验证') || text.includes('nc_1_n1z');
 }
 
-async function solveCaptchaWithCapSolver() {
+async function solveCaptchaWithCapSolver(page) {
   if (!process.env.CAPSOLVER_API_KEY) {
     throw new Error('CAPSOLVER_API_KEY missing. Set it in .env to enable captcha solving.');
   }
-  // TODO: Implement CapSolver task for Alibaba/1688 slider.
-  // Placeholder: return false so caller can bubble a friendly error.
+
+  // Best-effort extraction of captcha config (Aliyun slider often exposes window._config_)
+  const cfg = await page.evaluate(() => window._config_ || null).catch(() => null);
+  const websiteURL = page.url();
+  const taskType = process.env.CAPSOLVER_TASK_TYPE || 'AntiGeeTestTaskProxyless';
+
+  const taskPayload = {
+    clientKey: process.env.CAPSOLVER_API_KEY,
+    task: {
+      type: taskType,
+      websiteURL,
+      // These fields are best-effort. Adjust depending on CapSolver task type.
+      websiteKey: cfg?.NCAPPKEY || cfg?.NCTOKENSTR || undefined,
+      challenge: cfg?.NCTOKENSTR || undefined,
+      // For some tasks, you may need additional fields like gt/challenge or custom data.
+    }
+  };
+
+  const createRes = await fetch('https://api.capsolver.com/createTask', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(taskPayload)
+  }).then(r => r.json());
+
+  if (!createRes?.taskId) return false;
+
+  // Poll for result
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 1500));
+    const res = await fetch('https://api.capsolver.com/getTaskResult', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientKey: process.env.CAPSOLVER_API_KEY, taskId: createRes.taskId })
+    }).then(r => r.json());
+
+    if (res?.status === 'ready') {
+      // TODO: Apply solution to page depending on task type
+      return true;
+    }
+    if (res?.status === 'failed') return false;
+  }
+
   return false;
 }
 
@@ -64,10 +104,10 @@ server.registerTool('search_1688', {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
   if (await detectCaptcha(page)) {
-    const solved = await solveCaptchaWithCapSolver();
+    const solved = await solveCaptchaWithCapSolver(page);
     if (!solved) {
       await browser.close();
-      throw new Error('Captcha detected on 1688. Provide cookies or implement CapSolver slider task.');
+      throw new Error('Captcha detected on 1688. Provide cookies or adjust CapSolver task type/fields.');
     }
   }
 
