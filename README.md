@@ -18,5 +18,5 @@ npm run dev
 - `search_1688({ query, maxResults })` -> returns `{ results: [{ title, price, link, seller }] }`
 
 ## Notes
-- Add CapSolver integration for captcha solving.
+- Captcha solving is stubbed; add CapSolver slider task implementation.
 - Cookies are recommended for stability.
