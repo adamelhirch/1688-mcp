@@ -1,0 +1,17 @@
+{
+  "name": "1688-mcp",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "description": "MCP server to search 1688.com via Playwright + CapSolver",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.1.1",
+    "playwright": "^1.49.0",
+    "dotenv": "^16.4.5",
+    "zod": "^3.23.8"
+  }
+}
